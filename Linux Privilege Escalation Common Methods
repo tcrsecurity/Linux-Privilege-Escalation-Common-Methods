@@ -1,0 +1,313 @@
+Linux Privilege Escaltion::
+
+
+Our ultimate goal in privilege escatlation is to gaining the root shell on system
+
+1>>>>>
+
+Users , Groups and Files and Directories
+
+Users can belong to groups and Groups have multiple users
+
+Users::>>>>>>
+
+
+Users account are configures in the /etc/passwd file.
+User password hashes are stored in the /etc/shadow file.
+
+
+Groups::>>>>>>>
+
+Groups are configures in the /etc/group file.
+Users have a primary group. and can have multiple secondary groups.
+
+
+Directory Permissions::::>>>>
+
+
+* Execute- When set , the directory can be entered. Without this permission, neither the read and nor write permission will work.
+* Read - when set, directory content can be listed.
+*Write - when set, files and subdirectory can be created in the directory .
+
+
+Special Permissions :::>>>>>
+
+
+setuid(SUID)bit
+     when set ,files will get executed with the pribileges of owner 
+setgid(SGID)bit
+      when set one a file ,the file will get executed with the privileges of the file group.
+
+
+
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+First we run linux_smart_enum.sh script  you can downlaod it from github and see found any misconfiguration 
+If found any method to gain root shell then use that 
+
+Always check check hisory file some times there may be paasword typed by root user and stored
+
+Check for config files may have root user password
+
+Check for ssh private key we can login with this private key 
+
+Check the version of the bash it may be less then 4.2 then privlege 
+
+
+>>>>>>>>>>>>>>>>>>>>>>   Kernal Exploit  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+
+Kernals are the core of any operating system
+Think of it is as a layer between application and software and the actual computer hardware
+The kernal has complete control over the operating system. 
+Enumerate kernal version with uname -a command 
+exploit can found at searchsploit or by linux-exploit-suggester
+Find the matching exploit and compile and run
+Kernal exploit can often be unstable and may be one-shot or cause a system crash use this as last option
+
+
+
+
+>>>>>>>>>>>>>>     Service Exploits::     >>>>>>>>>>>>
+
+
+
+
+Services are simply programs that run in the background accepting imput or performing regular task.
+If vulnerable service is running as root , exploiting them can lead to command execution as root.
+service exploit found at searchsploit , google and exploitdb
+
+
+
+
+>>>>>>>>>>>>>>>>>>>>          Port Forwarding:::               >>>>>>>>>>>
+
+
+
+In some instances, a root process may be bound to an internal port, through which it communitcates.
+If some reason , an exploit cannot run locally on the target machine, the port can be forwardedd using
+SSH  to your local machine:
+ssh -R local_port:127.0.0.1:server_port username@local_macine_ip
+
+
+
+
+>>>>>>>>>>>>> Weak file permission >.>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+
+
+
+Readable /etc/shadow file which have root user hash and crack the hash and use it login as root
+Writable /etc/shadow file we can put over password hash at root user's hash and login
+Writable /etc/passwd file then we add new user with root permission and privileges 
+
+Backups::
+Even if a machine has correct permission we can check fot backup file which can have sensitive data
+some common folder for bakcups /home, /root/ , /tmp, /var/backups
+
+
+
+
+
+
+
+
+>>>>>>>>>>>>>>>>>>>       Sudo            >>>>>>>>>>>>>>>>>>>>>>>
+
+
+
+
+
+
+list programs a user is allowed to run 
+sudo -l
+
+if sudo is unrectricted then 
+sudo su                                gives use root shell
+
+If for some reason the us program in not allowed , there are many other ways to escaletes
+sudo -s 
+sudo -i
+sudo /bin/bash
+sudo passwd
+
+If we run other command as root with sudo then we can also use shell escape sequence 
+Go to gtfobins for find shell escape sequence for a command 
+
+
+Abusing Intented funcionality
+
+If a program doesn't have a escape sequence , it may still be possible to use it to escalate privileges
+If we can read file owned by root , we may be able to extract usful info
+example::
+sudo apache2 -f /etc/shadow    May have root user hash
+If we write to files owned by root , we may be able to insert or modify info
+
+
+Environment Variables:::
+
+Program run through sudo can inherit the environment variable from user's environment
+sudo -l if there LD_PRELOAD AND LD_LIBRARY then
+
+
+
+
+LD_PRELOAD
+
+LD_PRELOAD  is an environment variable which can be set to the path of a shared object(so) file.
+sudo must be configured to preserve the LD_PRELOAD env varible the env_keep option.
+create preload.c file 
+gcc -fPIC -shared -nostartifiles preload.c -o /tmp/preload.so
+Now set over env variable to shared object we get root shell
+sudo LD_PRELOAD=/tmp/preload.so find
+
+
+
+
+LD_LIBRARY_PATH
+
+The LD_LIBRARY_PATH  env variable contains a set of direcories where shared libraries are searches
+ldd /usr/sbin/apache2  pring the shared libraries used by a program
+By creating a shared library with the same name as one used by a program, and setting LD_LIBRARY_PATH
+to its parent directory , the program will load our shared library instead.
+vim library_path.c
+gcc -o libcrypt.so.1 -shared -fPIC library_path.c
+sudo LD_LIBRARY_PATH=. apache2
+
+
+
+
+
+
+>>>>>>>>>>>>>>>>>>>>>>     Cron Jobs    >>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+
+
+
+User crontbs are usually located in /var/spool/cron/ or /var/spool/cron/crontabs/
+The system-wide crontab in located at /etc/crontab.
+If cron job is owned by root and writable by user then we can use it for escalation
+we write our script according to the situation and waiting for execute the our script.
+
+
+PATH Environment Variable ::::
+
+The crontab PATH env variable is by default set to /usr/bin:/bin
+The PATH varible can be overwritten in the crontab file.
+If a cron job program/script does not use an absolute path, and one of the PATH dirctories is writable by our user , we may be able to create a program/script with same name as the cron job and
+cron is execute our script instead of original pragram.
+
+
+Wildcards & Filenames:::
+
+Since filesystem in linux are genrally very permissive with filenames, and filename expansion happens before the command is executed, it is possible to pass command line optins(eg. -h, --help)
+to commands by creating files with these names
+
+The follwing commands should show how this works:
+
+ls *
+touch ./-l
+ls*
+
+Filenames are not simply restricted to simple optins like -h or --help.
+In fact we can create filenames that match complex optiopns:
+--options=key=value
+
+We can use GTFobins to find whether a command has command line options which we can use
+
+Example:::
+
+
+In cron we see a file is excuted by tar with * then we go to gtfobins and find executeble
+tar -cf /dev/null /dev/null --checkpoint=1 --checkpoint-action=exec=/bin/sh
+From this how can we execute our shell
+
+first we create a revrese shell shell.raw
+then create other 
+touch ./--checkpoint=1
+touch ./--checkpoint-action=exec=shell.raw
+
+After cron jobs we getting a revrse shell on our attacker machine
+
+
+
+
+>>>>>>>>>>>>>>>>>>>   NFS      >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+
+NFS(Network File System) is a popular distributed fiel system. NFS shares are configured in the 
+/etc/exports file.
+Remote user can mount shares, access, create ,moidfy files.
+By default, created file inherit the remote user's id and group and group id(as owner and group respectively), even if they don't exit on the NFS server.
+
+
+Useful Commands :
+
+Show the NFS server's export list:
+showmount -e target
+nmap -sV --script=nfs-showmount target
+
+Mount an NFS share:
+
+Mount -o rw,vers=2 target:share local_directory
+
+
+Root squashing is how NFS prevents an obvious privilege escalation. In this if any user want to create NFS as root then he treated as nobody and nogroup.
+
+No_root_squash is an NFS configuration option which turns root squashing off. In this remote user 
+who indentifies as root can create files on the NFS share as local root user.
+
+
+
+
+>>>>>>>>>>>>>>>>>  Others >>>>>>>>>>>>>>>>
+
+
+Certain program isntall SUID files to aid their operatioon. Just as services whic run as root
+can have vulnerabilties we can explit for a root shell, so too can these SUID files. Exploit can 
+found google . 
+
+
+Shared Object Injection :::::
+
+When a program is executed , it will try to load the shared object it requres. By using a program
+called strace, we can track these system calls and determine whether any shared objects were not found. If we can write to the location the program tries to open, we can create a shared object and 
+spawn a root shell when it loaded.
+
+
+strace program | grep "acess|not found"
+
+If there is any so file which program tries to load but not present then we create that so file and when program load that file then we are root
+
+
+PATH env variable:::
+
+The PATH environment variable contains a list of direcotries where the shell should to find program.
+If a program tries to execute another program, but only specfies the program name, rather than its full path. the shell will search the PATH direcotries until it is found.
+
+Since a user has full control over their PATH variable , we can tell the shell to first look for program in a directory we can write to.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
